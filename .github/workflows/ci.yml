@@ -1,0 +1,35 @@
+name: "PrivacyAwareLogTransformer CI"
+
+on: push
+
+env:
+  CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Run SwiftLint
+      run: |
+        brew install swiftlint
+        swiftlint lint --strict --reporter "json" | tee ./swiftlint.json
+        curl "https://api.check-run-reporter.com/api/v1/submissions" \
+          --user token:$CHECK_RUN_TOKEN \
+          -X POST \
+          -F report=@"./swiftlint.json" \
+          -F label="SwiftLint" \
+          -F sha="$GITHUB_SHA" \
+          -F root="$(pwd)"
+    - name: Run Tests
+      run: swift test -v
+    - name: Test Build Failure
+      run: |
+        sh build/test-expected-failure.sh
+  test:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build and Test Example Project
+      run: |
+        xcodebuild -project iOS\ Example/iOS\ Example.xcodeproj -scheme "iOS Example" -destination 'platform=iOS Simulator,name=iPhone 11 Pro' -derivedDataPath './derivedData' clean test
